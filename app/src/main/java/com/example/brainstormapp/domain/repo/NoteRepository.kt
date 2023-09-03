@@ -13,4 +13,6 @@ interface NoteRepository {
     fun getNotesOrderedByDate(): Flow<List<Note>>
 
     fun getNotesOrderedByTitle(): Flow<List<Note>>
+
+    fun getNotesByTitle(searchQuery: String): Flow<List<Note>>
 }

@@ -27,4 +27,8 @@ class NoteRepositoryImpl(private val dao: NotesDao): NoteRepository {
     override fun getNotesOrderedByTitle(): Flow<List<Note>> {
         return dao.getNotesOrderedByTitle()
     }
+
+    override fun getNotesByTitle(searchQuery: String): Flow<List<Note>> {
+        return dao.getNotesByTitle(searchQuery)
+    }
 }

@@ -7,8 +7,8 @@ data class NoteDetailState(
     val noteTitle: String = "",
     val isNoteTitleHintVisible: Boolean = false,
     val noteContent: String = "",
-    val isNoteContentHintVisible: Boolean = false,
+    val noteDate: String = "",
     val noteColor: Long = (0xFFFFFF).toLong(),
-    val bottomSheetFocused: Boolean = false
+    val bottomSheetFocused: Boolean = false,
 
 )

@@ -26,6 +26,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.ModalBottomSheetLayout
@@ -48,6 +49,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -60,14 +63,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.brainstormapp.data.model.BottomSheetState
 import com.example.brainstormapp.data.model.NoteDetailState
+import com.example.brainstormapp.data.model.UIState
 import com.example.brainstormapp.ui.theme.LightPeach
 import com.example.brainstormapp.ui.theme.PalePurple
 import com.example.brainstormapp.ui.theme.PeachWhite
@@ -85,7 +92,8 @@ import kotlinx.coroutines.launch
 fun NoteDetailsScreen(
     state: State<NoteDetailState>,
     bottomSheetView: State<BottomSheetState>,
-    onNavigateUp: () -> Unit,
+    uiState: UIState,
+    onNavigateUp: (Int) -> Unit,
     onEvent: (NoteDetailEvent) -> Unit,
 ){
 
@@ -102,6 +110,12 @@ fun NoteDetailsScreen(
 
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(key1 = uiState){
+        if (uiState.deleteProcessed){
+            onNavigateUp(2)
+        }
+    }
+
 
     BackHandler {
         if(someState.isVisible){
@@ -109,7 +123,7 @@ fun NoteDetailsScreen(
                 someState.hide()
             }
         }else{
-            onNavigateUp()
+            onNavigateUp(1)
         }
     }
 
@@ -118,7 +132,7 @@ fun NoteDetailsScreen(
         sheetShape = RoundedCornerShape(topEnd = 16.dp, topStart = 16.dp),
         sheetContent = {
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             bottomSheetView.value.let { bottomSheetViewState ->
                 when(bottomSheetViewState.view){
@@ -163,7 +177,9 @@ fun NoteDetailsScreen(
                             ) {
 
                             Text(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 18.dp),
                                 text = "Brain",
                                 style = Typography.titleMedium,
                                 textAlign = TextAlign.Center
@@ -184,14 +200,15 @@ fun NoteDetailsScreen(
                                         UserGptQuery(
                                             modifier = Modifier
                                                 .fillMaxWidth()
+                                                .background(PeachWhite)
                                                 .padding(16.dp),
                                             message = message)
                                     }else {
                                         GptResponse(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .background(LightPeach)
-                                                .padding(16.dp),
+//                                                .background(LightPeach)
+                                                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                                             message = message,
                                             onAddResponse = {
                                                 Log.d("GPT_RESPONSE", "ADD PRESSED")
@@ -206,21 +223,32 @@ fun NoteDetailsScreen(
 
                             Row(modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
+                                .padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                TextField(
                                     modifier = Modifier.weight(1F),
                                     shape = RoundedCornerShape(30.dp),
                                     value = gptQuery,
+                                    textStyle = Typography.bodyMedium,
+                                    placeholder = { Text(text = "Ask me anything!", style = Typography.bodyMedium, color = Color.Gray)},
+                                    colors = TextFieldDefaults.colors(
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent,
+                                        focusedContainerColor = PeachWhite,
+                                        unfocusedContainerColor = PeachWhite
+                                    ),
+                                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, keyboardType = KeyboardType.Text),
                                     onValueChange = { gptQuery = it },
                                     maxLines = 2)
                                 IconButton(onClick = { onEvent(NoteDetailEvent.SendMessage(gptQuery),)
-                                    Log.d("GPT", "CLICKED GPT")},
+                                    Log.d("GPT", "CLICKED GPT")
+                                                     gptQuery = ""},
                                     modifier = Modifier.background(PalePurple, CircleShape)) {
                                     Icon(Icons.Default.Send, contentDescription = "send message")
                                 }
                             }
                             Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-                            Spacer(modifier = Modifier.height(30.dp))
+//                            Spacer(modifier = Modifier.height(16.dp))
 
 
                         }
@@ -239,11 +267,11 @@ fun NoteDetailsScreen(
             topBar = {
                 CenterAlignedTopAppBar(
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(LightPeach),
-                    title = { Text(text = "Created 10-06-23 11:43", style = Typography.labelSmall,
+                    title = { Text(text = "Created ${state.value.noteDate}", style = Typography.labelSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis)},
                     navigationIcon = {
-                        IconButton(onClick = {onNavigateUp()}) {
+                        IconButton(onClick = {onNavigateUp(1)}) {
                             Icon(imageVector = Icons.Filled.ArrowBack, contentDescription = "")
                         }
                     },
@@ -289,21 +317,47 @@ fun NoteDetailsScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    BasicTextField(modifier = Modifier
-                        .padding(16.dp)
+                    TextField(modifier = Modifier
                         .fillMaxWidth(),
                         value = state.value.noteTitle,
+                        placeholder = { Text(text = "Title", color = Color.Gray, style = Typography.titleLarge)},
                         onValueChange = {
                             onEvent(NoteDetailEvent.SetTitle(it)) },
-                        textStyle = Typography.titleLarge)
-                    BasicTextField(modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth()
-                        .weight(1F),
+                        textStyle = Typography.titleLarge,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, keyboardType = KeyboardType.Text),
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ))
+                    TextField(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1F),
+                        placeholder = {
+                            Text(
+                                text = "Write something..",
+                                style = Typography.bodyMedium,
+                                color = Color.Gray
+                            )
+                        },
                         value = state.value.noteContent,
                         onValueChange = {
-                            onEvent(NoteDetailEvent.SetNoteContent(it))},
-                        textStyle = Typography.bodyMedium)
+                            onEvent(NoteDetailEvent.SetNoteContent(it))
+                        },
+                        colors = TextFieldDefaults.colors(
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        ),
+                        textStyle = Typography.bodyMedium,
+                        keyboardOptions = KeyboardOptions(
+                            capitalization = KeyboardCapitalization.Sentences,
+                            keyboardType = KeyboardType.Text
+                        ),
+                    )
 
 
                 }

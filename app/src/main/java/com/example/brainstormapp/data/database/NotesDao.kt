@@ -25,4 +25,7 @@ interface NotesDao{
 
     @Query("SELECT * FROM note ORDER BY title DESC")
     fun getNotesOrderedByTitle(): Flow<List<Note>>
+
+    @Query("SELECT * FROM note WHERE title LIKE '%' || :searchQuery || '%' ORDER BY dateCreated DESC")
+    fun getNotesByTitle(searchQuery: String): Flow<List<Note>>
 }

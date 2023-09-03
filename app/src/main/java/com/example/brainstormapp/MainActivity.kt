@@ -19,6 +19,7 @@ import com.example.brainstormapp.ui.notes_list.NotesListScreen
 import com.example.brainstormapp.ui.notes_list.NotesListViewModel
 import com.example.brainstormapp.ui.theme.LightPeach
 import com.example.brainstormapp.util.NoteDetailEvent
+import com.example.brainstormapp.util.NotesEvent
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import org.koin.androidx.compose.getViewModel
 
@@ -38,7 +39,7 @@ class MainActivity : ComponentActivity() {
             }
 
             val viewModel = getViewModel<NotesListViewModel>()
-            val stateHome = viewModel.state.collectAsState()
+            val stateHome = viewModel.notes
             val navController = rememberNavController()
 
             NavHost(navController = navController, startDestination = "notesList"){
@@ -46,7 +47,9 @@ class MainActivity : ComponentActivity() {
                     NotesListScreen(
                     state = stateHome,
                     onEvent = viewModel::onEvent,
-                    onNavigateToDetails = {navController.navigate("noteDetails/$it")})}
+                    onNavigateToDetails = {
+                        if(stateHome.searchMode){viewModel.onEvent(NotesEvent.ToggleSearch)}
+                        navController.navigate("noteDetails/$it")})}
                 composable(
                     route = "noteDetails/{noteId}",
                 arguments = listOf(
@@ -60,12 +63,16 @@ class MainActivity : ComponentActivity() {
                     val viewModelDetails = getViewModel<NoteDetailsViewModel>()
                     val stateDetails = viewModelDetails.state.collectAsState()
                     val stateBottomSheet = viewModelDetails.bottomSheetState.collectAsState()
+                    val uiState = viewModelDetails.uiState
 
                     NoteDetailsScreen(
                         state = stateDetails,
                         bottomSheetView = stateBottomSheet,
+                        uiState,
                         onNavigateUp = {
-                            viewModelDetails.onEvent(NoteDetailEvent.UpsertNote)
+                            if(it == 1){
+                                viewModelDetails.onEvent(NoteDetailEvent.UpsertNote)
+                            }
                             navController.popBackStack()
                         },
                         onEvent = {viewModelDetails.onEvent(it)})

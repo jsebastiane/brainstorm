@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.intl.Locale
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,6 +13,7 @@ import androidx.room.util.copy
 import com.example.brainstormapp.data.database.Note
 import com.example.brainstormapp.data.model.BottomSheetState
 import com.example.brainstormapp.data.model.NoteDetailState
+import com.example.brainstormapp.data.model.UIState
 import com.example.brainstormapp.data.model.chat.Message
 import com.example.brainstormapp.domain.repo.NoteRepository
 import com.example.brainstormapp.ui.theme.DedRed
@@ -30,6 +32,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Date
 
 class NoteDetailsViewModel(
@@ -38,15 +43,13 @@ class NoteDetailsViewModel(
 ) : ViewModel() {
 
     private val noteContent = savedStateHandle.getStateFlow("noteContent", "")
-    private val noteTitle = savedStateHandle.getStateFlow("noteTitle", "Untitled")
+    private val noteTitle = savedStateHandle.getStateFlow("noteTitle", "")
     private val noteColour = savedStateHandle.getStateFlow("noteColour", 0xFFF7B500)
+    private val noteDate = savedStateHandle.getStateFlow("noteDate", "--")
     private val isNoteTitleFocused = savedStateHandle.getStateFlow("isNoteTitleFocused", false)
-    private val isNoteContentFocused = savedStateHandle.getStateFlow("isNoteTitleFocused", false)
     private val isBottomSheetVisible = savedStateHandle.getStateFlow("isBottomSheetVisible", false)
     private val bottomSheetView = savedStateHandle.getStateFlow("bottomSheetView", BottomSheetView.OPTIONS)
     private val gptChat = savedStateHandle.getStateFlow("chatHistory", listOf<Message>())
-
-
 
 
     private var existingNote: Note? = null
@@ -54,6 +57,8 @@ class NoteDetailsViewModel(
     private var functions: FirebaseFunctions = Firebase.functions
     // Should I store date of creation?
 
+    var uiState by mutableStateOf(UIState())
+        private set
 
     // Don't think we need this we can just use the existingNote variable above
     private var existingNoteId: Long? = null
@@ -64,14 +69,14 @@ class NoteDetailsViewModel(
         noteTitle,
         noteColour,
         isNoteTitleFocused,
-        isNoteContentFocused
-    ) { content, title, colour, isTitleFocused, isContentFocused ->
+        noteDate
+    ) { content, title, colour, isTitleFocused, date ->
         NoteDetailState(
             noteContent = content,
             noteTitle = title,
             isNoteTitleHintVisible = title.isEmpty() && !isTitleFocused,
-            isNoteContentHintVisible = content.isEmpty() && !isContentFocused,
-            noteColor = colour,
+            noteDate = date,
+            noteColor = colour
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NoteDetailState())
 
@@ -104,10 +109,16 @@ class NoteDetailsViewModel(
             this.existingNoteId = noteId
             viewModelScope.launch {
                 notesRepo.getNoteById(noteId.toInt()).let { note ->
+
+
+                    val dateFormatter = SimpleDateFormat("dd-MM-yy HH:mm")
+                    val date = dateFormatter.format(note.dateCreated!!)
                     existingNote = note
                     savedStateHandle["noteTitle"] = note.title
                     savedStateHandle["noteContent"] = note.content
                     savedStateHandle["noteColour"] = note.tagColor
+                    savedStateHandle["noteDate"] = date
+
 
                 }
             }
@@ -139,6 +150,9 @@ class NoteDetailsViewModel(
 
             is NoteDetailEvent.SendMessage ->{
 
+//                val messageList = arrayListOf<Message>()
+//                messageList.addAll(gptChat.value)
+//                messageList.add(Message(""))
                 //Add message to arrayList
                 sendMessage(event.message).addOnCompleteListener {task ->
 
@@ -161,10 +175,17 @@ class NoteDetailsViewModel(
 
                         //Checking if the state observed by ui changes
 
-                        val messageList = arrayListOf<Message>()
-                        messageList.addAll(gptChat.value)
-                        messageList.add(task.result)
-                        savedStateHandle["chatHistory"] = messageList
+                        val gptResult = task.result
+//                        val messageList = arrayListOf<Message>()
+//                        messageList.addAll(gptChat.value)
+//                        messageList.add(task.result)
+                        Log.d("GPT", "${task.result}")
+                        savedStateHandle["chatHistory"] = gptChat.value.mapIndexed { index, message ->
+                            if(index == gptChat.value.size - 1){
+                                message.copy(role = "assistant", content = gptResult.content)
+                            }else message
+                        }
+//                        savedStateHandle["chatHistory"] = messageList
 //                        Log.d("GPT", "DRIVING ME CRAZY --> ${bottomSheetState.value.chatHistory}")
 
                     }
@@ -177,6 +198,7 @@ class NoteDetailsViewModel(
             is NoteDetailEvent.SetBottomSheetView -> {
                 savedStateHandle["bottomSheetView"] = event.view
             }
+
 
             is NoteDetailEvent.SetNoteContent -> {
                 savedStateHandle["noteContent"] = event.content
@@ -192,24 +214,32 @@ class NoteDetailsViewModel(
                 existingNote?.let {noteToDelete ->
                     viewModelScope.launch {
                         notesRepo.delete(noteToDelete)
+                    }.invokeOnCompletion {
+                        uiState = uiState.copy(deleteProcessed = true)
                     }
                 } ?: kotlin.run {
-                    Log.d("NOTE DELETE", "Not note to delete")
+                    Log.d("NOTE DELETE", "No note to delete")
                 }
 
             }
 
+            //This could be done so much better
             is NoteDetailEvent.SetTitle -> {
                 savedStateHandle["noteTitle"] = event.title
 
                 //If the note did not exist make not and set current note to the ID returned by room
                 if(existingNoteId == null){
+                    val date = Date(System.currentTimeMillis())
                     val note = Note(
-                        title = state.value.noteTitle,
-                        tagColor = state.value.noteColor,
-                        content = "",
-                        dateCreated = Date(System.currentTimeMillis())
+                        title = noteTitle.value,
+                        tagColor = noteColour.value,
+                        content = noteContent.value,
+                        dateCreated = date
                     )
+
+                    val dateFormatter = SimpleDateFormat("dd-MM-yy HH:mm")
+                    savedStateHandle["noteDate"] =  dateFormatter.format(date)
+
                     viewModelScope.launch {
                         val noteId = notesRepo.insertNote(note)
                         notesRepo.getNoteById(noteId.toInt()).let { updatedNote ->
@@ -238,7 +268,7 @@ class NoteDetailsViewModel(
             }
 
             is NoteDetailEvent.AddGptResponse -> {
-                savedStateHandle["noteContent"] = "${noteContent.value}\n----Brain----\n${event.text}"
+                savedStateHandle["noteContent"] = "${noteContent.value}\n----GPT RESPONSE----\n${event.text}"
                 updateChat(event.index)
 
             }
@@ -254,13 +284,15 @@ class NoteDetailsViewModel(
         val messageList = arrayListOf<Message>()
         messageList.addAll(gptChat.value)
         messageList.add(Message("user", text))
-        savedStateHandle["chatHistory"] = messageList
 
         val jsonString = gson.toJson(messageList)
         Log.d("GPT", jsonString)
         val data = hashMapOf(
             "text" to jsonString
         )
+
+        messageList.add(Message("loading", "Thinking..."))
+        savedStateHandle["chatHistory"] = messageList
 
 
         return functions
@@ -275,6 +307,7 @@ class NoteDetailsViewModel(
     }
 
     private fun updateChat(j: Int){
+        //Update chat with a temporary message
         savedStateHandle["chatHistory"] = gptChat.value.mapIndexed{i, message ->
             if(i == j){
                 Log.d("GPT_RESPONSE", "FOUND ONE")

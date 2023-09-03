@@ -1,14 +1,13 @@
 package com.example.brainstormapp.ui.notes_list
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -26,30 +25,22 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -60,29 +51,33 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
-import com.example.brainstormapp.data.database.Note
 import com.example.brainstormapp.data.model.NotesState
 import com.example.brainstormapp.ui.theme.LightPeach
 import com.example.brainstormapp.ui.theme.PalePurple
 import com.example.brainstormapp.ui.theme.Typography
 import com.example.brainstormapp.ui.theme.archivo
 import com.example.brainstormapp.util.NotesEvent
-import kotlinx.coroutines.launch
 import org.koin.androidx.compose.getViewModel
-import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NotesListScreen(
-    state: State<NotesState>,
+    state: NotesState,
     onEvent: (NotesEvent) -> Unit,
     onNavigateToDetails: (String) -> Unit,
 ){
 
-    val scope = rememberCoroutineScope()
-    val selectionMode = true
 
+    val haptic = LocalHapticFeedback.current
+
+
+    BackHandler(state.selectionMode || state.searchMode) {
+        if (state.selectionMode){
+            onEvent(NotesEvent.ToggleSelectionMode)
+        }else if (state.searchMode){
+            onEvent(NotesEvent.ToggleSearch)
+        }
+    }
 
     Scaffold(
         Modifier.background(PalePurple),
@@ -103,11 +98,6 @@ fun NotesListScreen(
             val aspectRatio = 3.2F
             val columMarginTop = (this.maxWidth.value/aspectRatio).dp
 
-            val note = Note(0, "Macroeconomics Paper", 0, "Some content goes here for demo that hopefully spans over two lines otherwise it should",
-            Date(System.currentTimeMillis())
-            )
-
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -118,26 +108,32 @@ fun NotesListScreen(
                     Spacer(modifier = Modifier.height(columMarginTop + 8.dp))
                 }
 
-                itemsIndexed(state.value.notesList){index, item ->
+                itemsIndexed(state.notesList){index, item ->
                     Log.d("NOTECOLOR", "${item.tagColor}")
                     NotesItem(
                         note = item,
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { onNavigateToDetails(item.uid.toString()) }) {
+                        onClick = {
+                            if(state.selectionMode){
+                                onEvent(NotesEvent.SelectNote(index))
+                            }else{
 
-                    }
+                                onNavigateToDetails(item.uid.toString())
+                            }
+                             },
+                        onLongClick = {
+                            onEvent(NotesEvent.OnLongClick(index))
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                    )
                 }
-//                items(8) { index ->
-//                    NotesItem(note = note, modifier = Modifier.fillMaxWidth(),
-//                    onClick = {},
-//                    onLongClick = {})
-//                }
+
                 item{
                     Spacer(modifier = Modifier.height(columMarginTop))
                 }
             }
 
-            if(state.value.notesList.isEmpty()){
+            if(!state.searchMode && state.notesList.isEmpty()){
                 Text(text = "Create your first note and start brainstorming", style = Typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -156,9 +152,8 @@ fun NotesListScreen(
                 colors = CardDefaults.cardColors(LightPeach),
             ) {
 
-                AnimatedVisibility(visible = selectionMode,
-                    enter = fadeIn(),
-                    exit = fadeOut()
+                AnimatedVisibility(visible = !state.selectionMode && !state.searchMode ,
+
                 ) {
                     Row(modifier = Modifier
                         .fillMaxSize()
@@ -189,7 +184,9 @@ fun NotesListScreen(
                             }
                         )
 
-                        IconButton(onClick = {  },
+                        IconButton(onClick = {
+                                             onEvent(NotesEvent.ToggleSearch)
+                        },
                             modifier = Modifier.background(Color.White, CircleShape)) {
                             Icon(Icons.Default.Search, contentDescription = "search",
                             modifier = Modifier.size(30.dp))
@@ -197,7 +194,7 @@ fun NotesListScreen(
                     }
                 }
 
-                AnimatedVisibility(visible = !selectionMode,
+                AnimatedVisibility(visible = state.selectionMode,
                     enter = fadeIn(),
                     exit = fadeOut()
                 ) {
@@ -207,18 +204,60 @@ fun NotesListScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween) {
 
-                        IconButton(onClick = {  },
+                        IconButton(onClick = {
+                                             onEvent(NotesEvent.ToggleSelectionMode)
+                        },
                             modifier = Modifier.background(Color.White, CircleShape)) {
                             Icon(Icons.Default.Close, contentDescription = "search",
                                 modifier = Modifier.size(30.dp))
                         }
 
-                        IconButton(onClick = {  },
+                        IconButton(onClick = {
+                                             onEvent(NotesEvent.DeleteSelected)
+                        },
                             modifier = Modifier.background(Color.White, CircleShape)) {
                             Icon(Icons.Default.Delete, contentDescription = "search",
                                 modifier = Modifier.size(30.dp))
                         }
                     }
+                }
+
+                AnimatedVisibility(visible = state.searchMode,
+
+                ) {
+
+                    Row (
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ){
+
+                        IconButton(onClick = {
+                                             onEvent(NotesEvent.ToggleSearch)
+                        },
+                            modifier = Modifier.background(Color.White, CircleShape)) {
+                            Icon(Icons.Default.Close, contentDescription = "search",
+                                modifier = Modifier.size(30.dp))
+                        }
+
+                        TextField(
+                            value = state.searchQuery,
+                            onValueChange = {
+                                onEvent(NotesEvent.SearchByTitle(it))
+                            },
+                            shape = RoundedCornerShape(30.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedContainerColor = Color.White,
+                                unfocusedContainerColor = Color.White
+                            )
+
+                        )
+                    }
+
                 }
 
 
@@ -236,7 +275,7 @@ fun NotesListScreen(
 @Composable
 fun PreviewListScreen(){
     val viewModel = getViewModel<NotesListViewModel>()
-    val state = viewModel.state.collectAsState()
+    val state = viewModel.notes
     NotesListScreen(state = state, onEvent = viewModel::onEvent, onNavigateToDetails = {})
 
 }

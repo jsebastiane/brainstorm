@@ -8,7 +8,16 @@ sealed interface NotesEvent{
 //    object Loading : NotesEvent
 //    object Error : NotesEvent
 
-    data class SortNotes(val sortType: SortType): NotesEvent
-    data class DeleteNote(val note: Note): NotesEvent
-    data class SetColour(val colour: Int): NotesEvent
+    object SortByDate: NotesEvent
+    object SortByTitle: NotesEvent
+    object ToggleSearch: NotesEvent
+    object DeleteSelected: NotesEvent
+
+    object ToggleSelectionMode: NotesEvent
+
+    data class SelectNote(val note: Int): NotesEvent
+
+    data class OnLongClick(val note: Int): NotesEvent
+    data class SearchByTitle(val query: String): NotesEvent
+
 }

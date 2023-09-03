@@ -1,75 +1,128 @@
 package com.example.brainstormapp.ui.notes_list
 
+import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.brainstormapp.data.database.Note
 import com.example.brainstormapp.data.model.NotesState
 import com.example.brainstormapp.domain.repo.NoteRepository
 import com.example.brainstormapp.util.NotesEvent
-import com.example.brainstormapp.util.SortType
-import com.google.firebase.functions.FirebaseFunctions
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.util.Date
 
 class NotesListViewModel(private val notesRepo: NoteRepository): ViewModel() {
 
 
-    private val _sortType = MutableStateFlow(SortType.DATE)
+    var notes by mutableStateOf<NotesState>(NotesState())
+        private set
 
 
-
-
-    // When _sortType is changed above, this reacts and retrieves data from RoomDB in
-    // new order
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val _notes = _sortType
-        .flatMapLatest { sortType ->
-            when(sortType){
-                SortType.DATE -> notesRepo.getNotesOrderedByDate()
-                SortType.TITLE -> notesRepo.getNotesOrderedByTitle()
-            }
-        }
-
-
-
-    private val _state = MutableStateFlow(NotesState())
-
-    //Flow state of all flows represented in a single NotesState object
-    val state = combine(_state, _sortType, _notes){ state, sortType, notes ->
-        state.copy(
-            notesList = notes,
-            sortType = sortType
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NotesState())
-
+    init {
+        getAllNotes()
+    }
 
     fun onEvent(event: NotesEvent){
         when(event){
-            is NotesEvent.DeleteNote -> {
+
+            is NotesEvent.SortByDate -> {
+                getAllNotes()
+                Log.d("Notes", "SortByDate called")
+            }
+
+            is NotesEvent.SortByTitle -> {
                 viewModelScope.launch {
-                    notesRepo.delete(event.note)
+                    notesRepo.getNotesOrderedByTitle().collectLatest {sortedList ->
+                        notes = notes.copy(notesList = sortedList)
+                    }
                 }
             }
 
-            /* Change to even.colour after*/
-            is NotesEvent.SetColour -> {
-                _state.update {it.copy(
-                    colour = event.colour.toLong()
-                )}
+            is NotesEvent.SearchByTitle -> {
+                notes = notes.copy(searchQuery = event.query)
+
+                viewModelScope.launch {
+                   notesRepo.getNotesByTitle(notes.searchQuery).collectLatest {sortedList ->
+                       notes = notes.copy(notesList = sortedList)
+                   }
+                }
             }
 
-            is NotesEvent.SortNotes -> {
-                _sortType.value = event.sortType
+            is NotesEvent.ToggleSearch -> {
+
+                if(notes.searchMode){
+                    notes = notes.copy(searchQuery = "")
+                    getAllNotes()
+                }
+                //the 'close' button and 'search' button will never be displayed at the same time
+                //so this works
+                notes = notes.copy(searchMode = !notes.searchMode)
+
+
+
             }
+
+            is NotesEvent.SelectNote -> {
+                addNoteToSelected(event.note)
+            }
+
+            is NotesEvent.OnLongClick -> {
+                Log.d("SelectionMode", "Called")
+                if(notes.selectionMode){
+                    addNoteToSelected(event.note)
+                }else{
+                    Log.d("SelectionMode", "Activated")
+                    notes = notes.copy(selectionMode = true)
+                    addNoteToSelected(event.note)
+                }
+
+            }
+
+            is NotesEvent.DeleteSelected -> {
+                viewModelScope.launch {
+                    for (note in notes.notesList){
+                        if (note.selected){
+                            notesRepo.delete(note)
+                        }
+                    }
+                    notes = notes.copy(selectionMode = false)
+//                    getAllNotes()
+                }
+            }
+
+            is NotesEvent.ToggleSelectionMode -> {
+                notes = notes.copy(notesList = notes.notesList.map {
+                    if (it.selected){
+                        it.copy(selected = false)
+                    }else it
+                }, selectionMode = false)
+            }
+
+
+            //Toggle on if long press made
 
         }
+
+    }
+
+    private fun getAllNotes(){
+        viewModelScope.launch {
+            notesRepo.getNotesOrderedByDate().collectLatest { newList ->
+                notes = notes.copy(notesList = newList)
+            }
+        }
+    }
+
+    private fun addNoteToSelected(note: Int){
+        val currentList = notes.notesList
+        notes = notes.copy(notesList = List(currentList.size) { index ->
+            if(currentList[index] == currentList[note]){
+                currentList[index].copy(selected = !currentList[index].selected)
+            }else currentList[index]
+        })
+
+
     }
 
 }
