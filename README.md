@@ -3,23 +3,37 @@
 
 **GPT Functionality**
 
-https://github.com/jsebastiane/brainstorm/assets/52160775/c56a4e72-d605-467a-ae68-888e31281709
+
+https://github.com/jsebastiane/brainstorm/assets/52160775/93490b94-4d86-4877-b9c7-cc8bc083d4e0
+
+
 
 **Search Notes**
 
-https://github.com/jsebastiane/brainstorm/assets/52160775/56879acb-6d06-4ab9-97a1-d4cb79784393
+
+https://github.com/jsebastiane/brainstorm/assets/52160775/22b0b23d-b116-4c9e-87be-58a4a2284350
+
+
 
 **Select and delete multiple items**
 
-https://github.com/jsebastiane/brainstorm/assets/52160775/38e89ca6-bbcd-4d46-a878-a9daed7390cb
+
+https://github.com/jsebastiane/brainstorm/assets/52160775/dabac0f8-161c-4f0e-8102-a7fc29e0adde
+
+
 
 **Create Note**
 
-https://github.com/jsebastiane/brainstorm/assets/52160775/b5d71638-d8fa-472c-b244-1efc44bce303
+
+https://github.com/jsebastiane/brainstorm/assets/52160775/9648056c-2528-4a49-8c38-99c3e37e46bd
+
+
 
 **Change Tag Colour**
 
-https://github.com/jsebastiane/brainstorm/assets/52160775/b43aee54-c661-4cda-aee5-964a908a18f0
+
+https://github.com/jsebastiane/brainstorm/assets/52160775/857ff789-2380-4a30-87b6-841720ba22e3
+
 
 
 
